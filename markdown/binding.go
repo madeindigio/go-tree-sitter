@@ -3,10 +3,20 @@ package markdown
 import (
 	"context"
 
-	sitter "github.com/smacker/go-tree-sitter"
-	tree_sitter_markdown "github.com/smacker/go-tree-sitter/markdown/tree-sitter-markdown"
-	tree_sitter_markdown_inline "github.com/smacker/go-tree-sitter/markdown/tree-sitter-markdown-inline"
+	sitter "github.com/madeindigio/go-tree-sitter"
+	tree_sitter_markdown "github.com/madeindigio/go-tree-sitter/markdown/tree-sitter-markdown"
+	tree_sitter_markdown_inline "github.com/madeindigio/go-tree-sitter/markdown/tree-sitter-markdown-inline"
 )
+
+// GetLanguage returns the markdown block language
+func GetLanguage() *sitter.Language {
+	return tree_sitter_markdown.GetLanguage()
+}
+
+// GetInlineLanguage returns the markdown inline language
+func GetInlineLanguage() *sitter.Language {
+	return tree_sitter_markdown_inline.GetLanguage()
+}
 
 type MarkdownTree struct {
 	blockTree     *sitter.Tree

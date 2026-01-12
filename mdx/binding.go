@@ -1,7 +1,8 @@
-package groovy 
+package mdx
 
+//#cgo CFLAGS: -I. -Itree_sitter
 //#include "parser.h"
-//TSLanguage *tree_sitter_groovy();
+//TSLanguage *tree_sitter_markdown();
 import "C"
 import (
 	"unsafe"
@@ -10,6 +11,6 @@ import (
 )
 
 func GetLanguage() *sitter.Language {
-	ptr := unsafe.Pointer(C.tree_sitter_groovy())
+	ptr := unsafe.Pointer(C.tree_sitter_markdown())
 	return sitter.NewLanguage(ptr)
 }
