@@ -16,7 +16,7 @@ import (
 )
 
 // Constants for the Tree Sitter version and download URL
-const sitterVersion = "0.22.5"
+const sitterVersion = "0.25.10"
 const sitterURL = "https://github.com/tree-sitter/tree-sitter/archive/refs/tags/v" + sitterVersion + ".tar.gz"
 
 func main() {
@@ -40,6 +40,11 @@ func main() {
 	copyFiles(filepath.Join(parentPath, "lib", "src"), filepath.Join(currentDir, "tmpts"), "*.c")
 	copyFiles(filepath.Join(parentPath, "lib", "src"), filepath.Join(currentDir, "tmpts"), "*.h")
 	copyFiles(filepath.Join(parentPath, "lib", "src", "unicode"), filepath.Join(currentDir, "tmpts"), "*.h")
+	// portable/endian.h is flattened as portable_endian.h: a root-level "endian.h"
+	// would shadow the system <endian.h> it includes on some platforms.
+	if err := copyFile(filepath.Join(parentPath, "lib", "src", "portable", "endian.h"), filepath.Join(currentDir, "tmpts", "portable_endian.h")); err != nil {
+		log.Fatalf("Error copying portable/endian.h: %v", err)
+	}
 
 	// Remove the original extracted directory
 	err = os.RemoveAll(parentPath)
@@ -154,6 +159,7 @@ func modifyIncludePaths(path string) error {
 		// Modify the content and write back
 		modifiedContent := strings.ReplaceAll(string(content), `"tree_sitter/`, `"`)
 		modifiedContent = strings.ReplaceAll(modifiedContent, `"unicode/`, `"`)
+		modifiedContent = strings.ReplaceAll(modifiedContent, `"portable/endian.h"`, `"portable_endian.h"`)
 		return os.WriteFile(filePath, []byte(modifiedContent), info.Mode())
 	})
 }

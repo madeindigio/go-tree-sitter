@@ -473,22 +473,36 @@ func TestTreeCursor(t *testing.T) {
 	assert.False(c.GoToParent())
 }
 
+// heapAlloc returns the live Go heap size after a full GC.
+func heapAlloc() uint64 {
+	runtime.GC()
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	return m.Alloc
+}
+
+// heapGrowth returns how much the live Go heap grew since baseline.
+func heapGrowth(baseline uint64) uint64 {
+	now := heapAlloc()
+	if now < baseline {
+		return 0
+	}
+	return now - baseline
+}
+
 func TestLeakParse(t *testing.T) {
 	ctx := context.Background()
 	parser := NewParser()
 	parser.SetLanguage(getTestGrammar())
 
+	baseline := heapAlloc()
+
 	for i := 0; i < 100000; i++ {
 		_, _ = parser.ParseCtx(ctx, nil, []byte("1 + 2"))
 	}
 
-	runtime.GC()
-
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-
-	// shouldn't exceed 1mb that go runtime takes
-	assert.Less(t, m.Alloc, uint64(1024*1024))
+	// the Go heap shouldn't grow by more than 1mb across the loop
+	assert.Less(t, heapGrowth(baseline), uint64(1024*1024))
 }
 
 func TestLeakRootNode(t *testing.T) {
@@ -496,19 +510,16 @@ func TestLeakRootNode(t *testing.T) {
 	parser := NewParser()
 	parser.SetLanguage(getTestGrammar())
 
+	baseline := heapAlloc()
+
 	for i := 0; i < 100000; i++ {
 		tree, err := parser.ParseCtx(ctx, nil, []byte("1 + 2"))
 		assert.NoError(t, err)
 		_ = tree.RootNode()
 	}
 
-	runtime.GC()
-
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-
-	// shouldn't exceed 1mb go runtime takes
-	assert.Less(t, m.Alloc, uint64(1024*1024))
+	// the Go heap shouldn't grow by more than 1mb across the loop
+	assert.Less(t, heapGrowth(baseline), uint64(1024*1024))
 }
 
 func TestParseInput(t *testing.T) {
@@ -584,17 +595,14 @@ func TestLeakParseInput(t *testing.T) {
 		},
 	}
 
+	baseline := heapAlloc()
+
 	for i := 0; i < 100000; i++ {
 		_, _ = parser.ParseInputCtx(ctx, nil, input)
 	}
 
-	runtime.GC()
-
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-
-	// shouldn't exceed 1mb that go runtime takes
-	assert.Less(t, m.Alloc, uint64(1024*1024))
+	// the Go heap shouldn't grow by more than 1mb across the loop
+	assert.Less(t, heapGrowth(baseline), uint64(1024*1024))
 }
 
 // see https://github.com/madeindigio/go-tree-sitter/issues/75

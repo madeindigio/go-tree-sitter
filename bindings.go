@@ -46,22 +46,52 @@ func ParseCtx(ctx context.Context, content []byte, lang *Language) (*Node, error
 type Parser struct {
 	isClosed bool
 	c        *C.TSParser
-	cancel   *uintptr
+	// cancel points to C-allocated memory read by the parse progress callback;
+	// a non-zero value halts the current parse.
+	cancel *uintptr
+	// timeoutMicros is the parse time limit (0 = unlimited). tree-sitter 0.25
+	// deprecated ts_parser_set_timeout_micros, so the limit is enforced by the
+	// progress callback passed to ts_parser_parse_with_options.
+	timeoutMicros uint64
 }
 
 // NewParser creates new Parser
 func NewParser() *Parser {
-	cancel := uintptr(0)
-	p := &Parser{c: C.ts_parser_new(), cancel: &cancel}
-	C.ts_parser_set_cancellation_flag(p.c, (*C.size_t)(unsafe.Pointer(p.cancel)))
+	cancel := (*uintptr)(C.calloc(1, C.size_t(unsafe.Sizeof(uintptr(0)))))
+	p := &Parser{c: C.ts_parser_new(), cancel: cancel}
 	runtime.SetFinalizer(p, (*Parser).Close)
 	return p
 }
 
+// parseLimits returns the C limits (cancellation flag + timeout) used for a parse call.
+func (p *Parser) parseLimits() C.ParseLimits {
+	return C.ParseLimits{
+		cancel_flag:    (*C.size_t)(unsafe.Pointer(p.cancel)),
+		timeout_micros: C.uint64_t(p.timeoutMicros),
+	}
+}
+
 // SetLanguage assignes Language to a parser
+//
+// The assignment is silently ignored when the language ABI version is not
+// supported by the runtime; use TrySetLanguage to detect that case.
 func (p *Parser) SetLanguage(lang *Language) {
+	_ = p.TrySetLanguage(lang)
+}
+
+// ErrIncompatibleLanguage is returned when a language was generated with a
+// tree-sitter ABI version that this runtime cannot load.
+var ErrIncompatibleLanguage = errors.New("incompatible language ABI version")
+
+// TrySetLanguage assigns Language to a parser and reports an error when the
+// language ABI version is outside [MinCompatibleLanguageVersion, LanguageVersion].
+func (p *Parser) TrySetLanguage(lang *Language) error {
 	cLang := (*C.struct_TSLanguage)(lang.ptr)
-	C.ts_parser_set_language(p.c, cLang)
+	if !C.ts_parser_set_language(p.c, cLang) {
+		return fmt.Errorf("%w: language ABI %d, runtime supports %d..%d",
+			ErrIncompatibleLanguage, lang.ABIVersion(), MinCompatibleLanguageVersion, LanguageVersion)
+	}
+	return nil
 }
 
 // ReadFunc is a function to retrieve a chunk of text at a given byte offset and (row, column) position
@@ -102,6 +132,10 @@ func (p *Parser) ParseCtx(ctx context.Context, oldTree *Tree, content []byte) (*
 		BaseTree = oldTree.c
 	}
 
+	// clear any stale cancellation left by a previous call whose context was
+	// cancelled after its parse had already finished
+	atomic.StoreUintptr(p.cancel, 0)
+
 	parseComplete := make(chan struct{})
 
 	// run goroutine only if context is cancelable to avoid performance impact
@@ -117,7 +151,7 @@ func (p *Parser) ParseCtx(ctx context.Context, oldTree *Tree, content []byte) (*
 	}
 
 	input := C.CBytes(content)
-	BaseTree = C.ts_parser_parse_string(p.c, BaseTree, (*C.char)(input), C.uint32_t(len(content)))
+	BaseTree = C.call_ts_parser_parse_string(p.c, BaseTree, (*C.char)(input), C.uint32_t(len(content)), p.parseLimits())
 	close(parseComplete)
 	C.free(input)
 
@@ -144,7 +178,7 @@ func (p *Parser) ParseInputCtx(ctx context.Context, oldTree *Tree, input Input) 
 	}
 
 	funcID := readFuncs.register(input.Read)
-	BaseTree = C.call_ts_parser_parse(p.c, BaseTree, C.int(funcID), C.TSInputEncoding(input.Encoding))
+	BaseTree = C.call_ts_parser_parse(p.c, BaseTree, C.int(funcID), C.TSInputEncoding(input.Encoding), p.parseLimits())
 	readFuncs.unregister(funcID)
 
 	return p.convertTSTree(ctx, BaseTree)
@@ -180,12 +214,15 @@ func (p *Parser) convertTSTree(ctx context.Context, tsTree *C.TSTree) (*Tree, er
 
 // OperationLimit returns the duration in microseconds that parsing is allowed to take
 func (p *Parser) OperationLimit() int {
-	return int(C.ts_parser_timeout_micros(p.c))
+	return int(p.timeoutMicros)
 }
 
 // SetOperationLimit limits the maximum duration in microseconds that parsing should be allowed to take before halting
 func (p *Parser) SetOperationLimit(limit int) {
-	C.ts_parser_set_timeout_micros(p.c, C.uint64_t(limit))
+	if limit < 0 {
+		limit = 0
+	}
+	p.timeoutMicros = uint64(limit)
 }
 
 // Reset causes the parser to parse from scratch on the next call to parse, instead of resuming
@@ -227,6 +264,8 @@ func (p *Parser) Debug() {
 func (p *Parser) Close() {
 	if !p.isClosed {
 		C.ts_parser_delete(p.c)
+		C.free(unsafe.Pointer(p.cancel))
+		p.cancel = nil
 	}
 
 	p.isClosed = true
@@ -337,8 +376,8 @@ func (i EditInput) c() *C.TSInputEdit {
 			column: C.uint32_t(i.OldEndPoint.Column),
 		},
 		new_end_point: C.TSPoint{
-			row:    C.uint32_t(i.OldEndPoint.Row),
-			column: C.uint32_t(i.OldEndPoint.Column),
+			row:    C.uint32_t(i.NewEndPoint.Row),
+			column: C.uint32_t(i.NewEndPoint.Column),
 		},
 	}
 }
@@ -353,9 +392,34 @@ type Language struct {
 	ptr unsafe.Pointer
 }
 
+// LanguageVersion is the latest language ABI version supported by the
+// vendored tree-sitter runtime.
+const LanguageVersion = C.TREE_SITTER_LANGUAGE_VERSION
+
+// MinCompatibleLanguageVersion is the oldest language ABI version that the
+// vendored tree-sitter runtime can still load.
+const MinCompatibleLanguageVersion = C.TREE_SITTER_MIN_COMPATIBLE_LANGUAGE_VERSION
+
 // NewLanguage creates new Language from c pointer
 func NewLanguage(ptr unsafe.Pointer) *Language {
 	return &Language{ptr}
+}
+
+// ABIVersion returns the tree-sitter ABI version the language was generated
+// with (e.g. 14 or 15).
+func (l *Language) ABIVersion() uint32 {
+	return uint32(C.ts_language_abi_version((*C.TSLanguage)(l.ptr)))
+}
+
+// Name returns the language name declared by the grammar. It is only
+// available for languages generated with ABI 15 or newer; older languages
+// return an empty string.
+func (l *Language) Name() string {
+	name := C.ts_language_name((*C.TSLanguage)(l.ptr))
+	if name == nil {
+		return ""
+	}
+	return C.GoString(name)
 }
 
 // SymbolName returns a node type string for the given Symbol.
