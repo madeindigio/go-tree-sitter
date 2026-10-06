@@ -7,6 +7,7 @@ extern "C" {
 
 #include "./alloc.h"
 #include "./ts_assert.h"
+#include <assert.h> // scanners call assert() directly
 
 #include <stdbool.h>
 #include <stdint.h>

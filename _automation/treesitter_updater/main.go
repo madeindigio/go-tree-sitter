@@ -160,6 +160,13 @@ func modifyIncludePaths(path string) error {
 		modifiedContent := strings.ReplaceAll(string(content), `"tree_sitter/`, `"`)
 		modifiedContent = strings.ReplaceAll(modifiedContent, `"unicode/`, `"`)
 		modifiedContent = strings.ReplaceAll(modifiedContent, `"portable/endian.h"`, `"portable_endian.h"`)
+		// Grammar scanners include the runtime's array.h and call assert()
+		// directly. Since 0.25 array.h only pulls <assert.h> through
+		// ts_assert.h when NDEBUG is unset, so release builds that define
+		// NDEBUG (e.g. zig cc with -O2) fail on an undeclared assert.
+		if filepath.Base(filePath) == "array.h" {
+			modifiedContent = strings.Replace(modifiedContent, `#include "./ts_assert.h"`, "#include \"./ts_assert.h\"\n#include <assert.h> // scanners call assert() directly", 1)
+		}
 		return os.WriteFile(filePath, []byte(modifiedContent), info.Mode())
 	})
 }
