@@ -27,8 +27,8 @@
       "parser.c",
       "scanner.c"
     ],
-    "reference": "v0.21.3",
-    "revision": "31a64b28292aac6adf44071e449fa03fb80eaf4e",
+    "reference": "v0.23.5",
+    "revision": "cac6d5fb595f5811a076336682d5d595ac1c9e85",
     "updateBasedOn": "tag"
   },
   {
@@ -38,8 +38,8 @@
       "parser.c",
       "scanner.c"
     ],
-    "reference": "v0.22.3",
-    "revision": "0b4aa47f07d958a49260aadc87e8474b03897c23",
+    "reference": "v0.23.4",
+    "revision": "f41e1a044c8a84ea9fa8577fdd2eab92ec96de02",
     "updateBasedOn": "tag"
   },
   {
@@ -180,9 +180,9 @@
       "parser.c",
       "scanner.c"
     ],
-    "reference": "0.3.8",
-    "revision": "e1a2d5ad1f61f5740677183cd4125bb071cd2f30",
-    "updateBasedOn": "tag"
+    "reference": "main",
+    "revision": "1852ea17b7f60fb3f9d84e0b1555d56b46b39fb1",
+    "updateBasedOn": "commit"
   },
   {
     "language": "lua",
@@ -194,6 +194,16 @@
     "reference": "master",
     "revision": "4932594a24f04e4ccf046919bc354272841b0077",
     "updateBasedOn": "commit"
+  },
+  {
+    "language": "objc",
+    "url": "https://github.com/tree-sitter-grammars/tree-sitter-objc",
+    "files": [
+      "parser.c"
+    ],
+    "reference": "v3.0.2",
+    "revision": "18802acf31d0b5c1c1d50bdbc9eb0e1636cab9ed",
+    "updateBasedOn": "tag"
   },
   {
     "language": "ocaml",
@@ -249,8 +259,8 @@
       "parser.c",
       "scanner.c"
     ],
-    "reference": "v0.21.0",
-    "revision": "a8eed3d73379528caa9310b20b69fd3c22dcecc7",
+    "reference": "v0.23.1",
+    "revision": "71bd32fb7607035768799732addba884a37a6210",
     "updateBasedOn": "tag"
   },
   {
@@ -298,8 +308,8 @@
       "parser.c",
       "scanner.c"
     ],
-    "reference": "0.5.0-with-generated-files",
-    "revision": "57c1c6d6ffa1c44b330182d41717e6fe37430704",
+    "reference": "0.7.4-with-generated-files",
+    "revision": "82bb3a533e0801fd2bbaa11dc49676e10bf41948",
     "updateBasedOn": "tag"
   },
   {

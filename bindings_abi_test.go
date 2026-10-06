@@ -5,9 +5,13 @@ import (
 	"testing"
 
 	sitter "github.com/madeindigio/go-tree-sitter"
+	"github.com/madeindigio/go-tree-sitter/cpp"
+	"github.com/madeindigio/go-tree-sitter/csharp"
 	"github.com/madeindigio/go-tree-sitter/golang"
 	"github.com/madeindigio/go-tree-sitter/java"
 	"github.com/madeindigio/go-tree-sitter/kotlin"
+	"github.com/madeindigio/go-tree-sitter/objc"
+	"github.com/madeindigio/go-tree-sitter/ruby"
 	"github.com/madeindigio/go-tree-sitter/rust"
 	"github.com/madeindigio/go-tree-sitter/swift"
 	"github.com/stretchr/testify/assert"
@@ -36,6 +40,10 @@ func TestGrammarsLoadAndParse(t *testing.T) {
 		{"kotlin", kotlin.GetLanguage(), "fun main() {\n    val x = 1\n    println(x)\n}\n", "source_file"},
 		{"rust", rust.GetLanguage(), "fn main() {\n    let x: i32 = 1;\n    println!(\"{}\", x);\n}\n", "source_file"},
 		{"java", java.GetLanguage(), "class A {\n  int f(int x) { return x + 1; }\n}\n", "program"},
+		{"csharp", csharp.GetLanguage(), "class A { int F(int x) => x + 1; }\n", "compilation_unit"},
+		{"ruby", ruby.GetLanguage(), "def f(x)\n  x + 1\nend\n", "program"},
+		{"cpp", cpp.GetLanguage(), "int f(int x) { return x + 1; }\n", "translation_unit"},
+		{"objc", objc.GetLanguage(), "@interface A : NSObject\n- (void)f;\n@end\n", "translation_unit"},
 	}
 
 	for _, tc := range cases {
